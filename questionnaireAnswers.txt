@@ -1,0 +1,283 @@
+## Reservation Data Analysis Project Questionnaire
+
+### 
+Project Data Points
+
+1. Across all reservation partners for January & February, how many completed reservations occurred?
+
+	select count(signed_in_at)
+	
+from clubready_reservations			
+	
+where signed_in_at is not null AND (MONTH(signed_in_at) = 01 OR MONTH(signed_in_at) = 02)
+	
+union
+
+	select count(checked_in_at)
+	
+from mindbody_reservations
+	
+where checked_in_at is not null AND (MONTH(checked_in_at) = 01 OR MONTH(checked_in_at) = 02);
+	
+	
+	Total: 135
+
+2. Which studio has the highest rate of reservation abandonment (did not cancel but did not check-in)?
+
+	select studio_key, 
+		
+		TotalReservationsPerStudio, 
+		
+		TotalReservationsAttended,
+		
+		(TotalReservationsPerStudio - TotalReservationsAttended) as AbandonmentRate
+	
+from ( select studio_key,
+				
+			count(reserved_for) as TotalReservationsPerStudio,
+
+			count(signed_in_at) as TotalReservationsAttended
+
+		from clubready_reservations
+
+		group by studio_key) as subquery
+	
+union all 
+	
+select studio_key,
+ 
+		TotalReservationsPerStudio,
+ 
+		TotalReservationsAttended,
+
+		(TotalReservationsPerStudio - TotalReservationsAttended) as AbandonmentRate
+
+	from ( select studio_key,
+
+			count(reserved_at) as TotalReservationsPerStudio,
+
+			count(checked_in_at) as TotalReservationsAttended
+
+		from mindbody_reservations
+
+		group by studio_key) as subquery
+	
+order by AbandonmentRate;
+				
+
+
+	Answer: Crossfit Control, Jacksonville Beach
+
+3. Which fitness area (i.e., tag) has the highest number of completed reservations for February?
+			select class_tag, 
+		
+				count(signed_in_at) as CompletedReservation
+
+			from clubready_reservations
+			
+where MONTH(signed_in_at) = 02
+
+			union
+			select class_tag, 
+		
+				count(checked_in_at) as CompletedReservation
+
+			from mindbody_reservations
+			
+where MONTH(checked_in_at) = 02
+
+			group by class_tag
+			
+order by CompletedReservation;		
+	Answer: Yoga
+
+4. How many members completed at least 1 reservation and had no more than 1 cancelled reservation in January?
+
+
+				select count(member_id)
+				
+from ( select member_id,
+		
+				count(reserved_for) as NumberofReservations,
+		
+				count(canceled = true) as NumberofCancellations
+			
+		from clubready_reservations
+			
+		where MONTH(reserved_for) = 01
+			
+		group by member_id) as subquery
+
+				where NumberofReservations > 0 AND NumberofCancellations < 2
+        			
+union
+				
+select count(member_id)
+				
+from ( select member_id,
+			
+			count(reserved_at) as NumberofReservations,
+			
+			count(canceled_at) as NumberofCancellations
+			
+		from mindbody_reservations
+			
+		where MONTH(reserved_at) = 01
+			
+		group by member_id) as subquery
+				
+where NumberofReservations > 0 AND NumberofCancellations < 2;		
+
+	Total: 22
+
+5. At what time of day do most users book classes? Attend classes? (Morning = 7-11 AM, Afternoon = 12-4 PM, Evening = 5-10 PM)
+
+
+	Booked:
+				select case 
+	
+					when date_format(reserved_for, '%H:%i:s') between '07:00:00' and '11:59:59' then 'morning' 
+    
+					when date_format(reserved_for, '%H:%i:s') between '12:00:00' and '16:59:59' then 'afternoon' 
+	
+					when date_format(reserved_for, '%H:%i:s') between '17:00:00' and '22:59:59' then 'evening' 
+	
+					end as bucket,
+				count(1) as cnt
+				
+from clubready_reservations
+
+				union
+				select case 
+	
+					when date_format(reserved_at, '%H:%i:s') between '07:00:00' and '11:59:59' then 'morning' 
+    
+					when date_format(reserved_at, '%H:%i:s') between '12:00:00' and '16:59:59' then 'afternoon' 
+	
+					when date_format(reserved_at, '%H:%i:s') between '17:00:00' and '22:59:59' then 'evening' 
+	
+					end as bucket,
+				count(1) as cnt
+				
+from mindbody_reservations
+
+				group by bucket;				
+	Attended:
+				select case 
+	
+					when date_format(signed_in_at, '%H:%i:s') between '07:00:00' and '11:59:59' then 'morning' 
+    
+					when date_format(signed_in_at, '%H:%i:s') between '12:00:00' and '16:59:59' then 'afternoon' 
+	
+					when date_format(signed_in_at, '%H:%i:s') between '17:00:00' and '22:59:59' then 'evening' 
+	
+					end as bucket,
+				count(1) as cnt
+				
+from clubready_reservations
+
+				union
+				select case 
+	
+					when date_format(checked_in_at, '%H:%i:s') between '07:00:00' and '11:59:59' then 'morning' 
+    
+					when date_format(checked_in_at, '%H:%i:s') between '12:00:00' and '16:59:59' then 'afternoon' 
+	
+					when date_format(checked_in_at, '%H:%i:s') between '17:00:00' and '22:59:59' then 'evening' 
+	
+					end as bucket,
+				count(1) as cnt
+				
+from mindbody_reservations
+
+				group by bucket;
+
+	Overall: Most booked for morning (between 7a and 11a)
+		 Most attended for morning (between 7a and 11a)
+
+6. How many confirmed completed reservations did the member (ID) with the most reserved classes in February have?
+
+
+				select member_id,
+		
+					Reservations,
+        
+					Complete
+
+				from (select member_id,
+		
+					count(reserved_for) as Reservations,
+		
+					count(signed_in_at) as Complete
+	
+				      from clubready_reservations
+    
+				      where MONTH(reserved_for) = 02
+
+				      group by member_id) as subquery
+    
+				union
+				select member_id,
+		
+					Reservations,
+        
+					Complete
+
+				from (select member_id,
+		
+					count(reserved_at) as Reservations,
+		
+					count(checked_in_at) as Complete
+	
+				      from mindbody_reservations
+    
+				      where MONTH(reserved_at) = 02
+
+				      group by member_id) as subquery
+    
+				order by Reservations, Complete;
+
+	Answer: Member_id 6 reserved 5 classes in February and completed all 5 classes.
+
+
+7. Write a query that unions the `mindbody_reservations` table and `clubready_reservations` table as cleanly as possible.
+
+
+
+		select member_id, studio_key, class_tag, reserved_for, signed_in_at
+		
+from clubready_reservations
+		
+union all
+		
+select member_id, studio_key, class_tag, reserved_at, checked_in_at
+		
+from mindbody_reservations;	
+
+
+### Project Discussion
+
+1. What opportunities do you see to improve data storage and standardization for these datasets?
+
+
+	Having clubready and mindbody have the same fields would be helpful in comparing the two tables across all available variables. 
+	Naming convention for each table being consistent would also help (i.e. reserved_for and reserved_at being the same, since they convey
+		the same data).
+	
+2. What forecasting opportunities do you see with a dataset like this and why?
+
+
+	Using the data in these tables allow us to predict when classes are most likely to be reserved, both time of day and day of week. We can
+		also look at trends through the month (i.e. are reservations made in the beginning of the month moreso than later in the month).
+	We can see trends in how far out a reservation is made compared to if that reservation is canceled or missed. This can help in
+		determining the window allowed for future reservations. If, say, 70% of reservations are missed when reserved two weeks prior to 
+		the class, but only 30% are missed when reserved 7 days prior to the class, the window allowed for reservations could be changed
+		to 7 days to reduce the number of missed classes.
+	
+3. What other data would you propose we gather to make reporting/forecasting more robust and why?
+	
+	For the mindbody table, including the level would allow for tracking if members move up in level of classes and would allow for 
+		prediction of when that would happen. 
+	If ads/marketing is used in or for the app/website, including gender and age in the tables would allow for more specific marketing to 
+		either groups that are already using PeerFit to bring in more of that group, or to market to other smaller groups not 
+		represented in the data as much.
